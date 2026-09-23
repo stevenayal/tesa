@@ -1,0 +1,37 @@
+# Datos: NUNCA versionar (contienen datos personales)
+data/*
+!data/.gitkeep
+*.csv
+*.jsonl
+*.json.gz
+*.zip
+*.parquet
+
+# Reporte agregado sí se versiona
+!reports/*.md
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+build/
+dist/
+
+# Entorno
+.env
+.env.*
+*.yaml.local
+
+# IDE / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Notebooks
+.ipynb_checkpoints/
