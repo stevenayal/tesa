@@ -43,12 +43,23 @@ El CLI filtra por estos rubros por defecto (`--rubros 4,5,24`). Para analizar to
 
 ## Fase 1: prueba de factibilidad
 
-### 1. Descargar los datos (manual)
+### 1. Descargar los proveedores (automático)
+
+```bash
+python -m tesa.proveedores_dncp --salida data/raw/proveedores.csv
+# prueba corta: python -m tesa.proveedores_dncp --rubros 5 --max-paginas 3
+```
+
+Recorre el [buscador de proveedores de la DNCP](https://www.contrataciones.gov.py/buscador/proveedores.html) para los rubros 4, 5 y 24 (IDs internos del buscador: 20, 21 y 40). Espera 1 s entre páginas, reintenta ante errores y, si se corta, **se reanuda** al volver a ejecutarlo. Guarda solo RUC, razón social, nombre de fantasía, enlace y rubro: descarta representante, dirección, teléfono y correo.
+
+⚠️ Son proveedores **inscriptos** en el rubro, no **adjudicados**. Sirve para la fase 1; el cruce final va contra adjudicaciones.
+
+### 1b. Descargar la nómina y adjudicaciones (manual)
 
 Los portales bloquean descargas automatizadas o cambian sus URLs, así que la descarga es manual y los archivos van a `data/raw/`:
 
 - **Nómina de funcionarios** → [datos.sfp.gov.py](https://datos.sfp.gov.py/data/funcionarios/download) (CSV mensual). Guardar como `data/raw/nomina.csv`.
-- **Proveedores / adjudicaciones DNCP** → [contrataciones.gov.py/datos](https://www.contrataciones.gov.py/datos/data) (sección *Procesos completos* o *Adjudicaciones*, CSV por año). Guardar como `data/raw/proveedores.csv`.
+- **Adjudicaciones DNCP** (fase siguiente) → [contrataciones.gov.py/datos](https://www.contrataciones.gov.py/datos/data) (sección *Adjudicaciones*, CSV por año).
 
 Alternativa para OCDS completo: [OCP Data Registry – Paraguay DNCP](https://data.open-contracting.org/en/publication/63).
 
@@ -106,6 +117,7 @@ tesa/
 │   ├── normalizacion.py   # cédulas, RUC, dígito verificador
 │   ├── ingesta.py         # lectura de CSV y detección de columnas
 │   ├── alcance.py         # rubros del estudio (4, 5, 24) y filtro
+│   ├── proveedores_dncp.py # extractor del buscador de proveedores
 │   └── factibilidad.py    # cruce nómina × proveedores + reporte
 ├── tests/
 ├── data/                  # ignorado por git
