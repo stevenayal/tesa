@@ -17,6 +17,13 @@ from pathlib import Path
 
 import pandas as pd
 
+from tesa.alcance import (
+    CANDIDATAS_CATEGORIA,
+    RUBROS,
+    RUBROS_POR_DEFECTO,
+    filtrar_por_rubros,
+    parsear_rubros,
+)
 from tesa.ingesta import (
     CANDIDATAS_NOMINA,
     CANDIDATAS_PROVEEDORES,
@@ -115,8 +122,17 @@ def _veredicto(r: ResultadoFactibilidad) -> str:
     )
 
 
+def _describir_rubros(rubros: tuple[int, ...] | None) -> str:
+    if rubros is None:
+        return "todos los rubros"
+    return "; ".join(f"{c} – {RUBROS.get(c, 'rubro sin nombre registrado')}" for c in rubros)
+
+
 def generar_reporte(
-    r: ResultadoFactibilidad, fuente_nomina: str, fuente_proveedores: str
+    r: ResultadoFactibilidad,
+    fuente_nomina: str,
+    fuente_proveedores: str,
+    rubros: tuple[int, ...] | None = RUBROS_POR_DEFECTO,
 ) -> str:
     """Reporte con números agregados únicamente (sin documentos)."""
     return f"""# Reporte de factibilidad — cruce nómina × proveedores
@@ -124,6 +140,8 @@ def generar_reporte(
 Generado: {date.today().isoformat()}
 
 Fuentes: `{Path(fuente_nomina).name}` × `{Path(fuente_proveedores).name}`
+
+Alcance: {_describir_rubros(rubros)}
 
 ## Resultado
 
@@ -156,6 +174,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--proveedores", required=True, help="CSV de proveedores (DNCP)")
     parser.add_argument("--col-nomina", help="Columna con la cédula en la nómina")
     parser.add_argument("--col-proveedores", help="Columna con el RUC en proveedores")
+    parser.add_argument(
+        "--rubros",
+        default=",".join(str(c) for c in RUBROS_POR_DEFECTO),
+        help="Códigos de categoría DNCP separados por coma (por defecto: 4,5,24)",
+    )
+    parser.add_argument(
+        "--todos-los-rubros", action="store_true", help="No filtrar por rubro"
+    )
+    parser.add_argument("--col-categoria", help="Columna con la categoría en proveedores")
     parser.add_argument("--reporte", default="reports/factibilidad.md")
     parser.add_argument("--detalle", default="data/output/coincidencias.csv")
     args = parser.parse_args(argv)
@@ -167,11 +194,18 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Nómina: {len(nomina):,} filas, columna '{col_n}'")
     print(f"Proveedores: {len(proveedores):,} filas, columna '{col_p}'")
 
+    rubros: tuple[int, ...] | None = None
+    if not args.todos_los_rubros:
+        rubros = parsear_rubros(args.rubros)
+        col_c = args.col_categoria or detectar_columna(proveedores, CANDIDATAS_CATEGORIA)
+        proveedores = filtrar_por_rubros(proveedores, col_c, rubros)
+        print(f"Filtro por rubros {rubros} (columna '{col_c}'): {len(proveedores):,} filas")
+
     resultado, detalle = cruzar(nomina, col_n, proveedores, col_p)
 
     Path(args.reporte).parent.mkdir(parents=True, exist_ok=True)
     Path(args.reporte).write_text(
-        generar_reporte(resultado, args.nomina, args.proveedores), encoding="utf-8"
+        generar_reporte(resultado, args.nomina, args.proveedores, rubros), encoding="utf-8"
     )
     Path(args.detalle).parent.mkdir(parents=True, exist_ok=True)
     detalle.to_csv(args.detalle, index=False)

@@ -59,6 +59,6 @@ def detectar_columna(df: pd.DataFrame, candidatas: list[str]) -> str:
         if candidata.lower() in por_minuscula:
             return por_minuscula[candidata.lower()]
     raise KeyError(
-        "No se encontró la columna de documento. Columnas disponibles: "
-        f"{list(df.columns)}. Indicala con --col-nomina / --col-proveedores."
+        f"No se encontró ninguna de las columnas {candidatas}. Columnas disponibles: "
+        f"{list(df.columns)}. Indicala con --col-nomina, --col-proveedores o --col-categoria."
     )

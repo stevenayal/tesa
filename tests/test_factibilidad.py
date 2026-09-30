@@ -76,9 +76,46 @@ def test_cli_extremo_a_extremo(tmp_path):
             "--proveedores", str(ruta_p),
             "--reporte", str(reporte),
             "--detalle", str(detalle),
+            "--todos-los-rubros",
         ]
     )
 
     assert codigo == 0
     assert reporte.exists()
     assert len(pd.read_csv(detalle, dtype=str)) == 2
+
+
+def test_cli_filtra_por_rubros_por_defecto(tmp_path):
+    nomina = pd.DataFrame({"documento": ["1111111", "3333333"]})
+    proveedores = pd.DataFrame(
+        {
+            "ruc": [_ruc("1111111"), _ruc("3333333")],
+            "categoria": ["5 - Consultorías, Asesorías e Investigaciones", "20 - Minerales"],
+        }
+    )
+    ruta_n = tmp_path / "nomina.csv"
+    ruta_p = tmp_path / "proveedores.csv"
+    nomina.to_csv(ruta_n, index=False)
+    proveedores.to_csv(ruta_p, index=False)
+    reporte = tmp_path / "reporte.md"
+    detalle = tmp_path / "detalle.csv"
+
+    main(["--nomina", str(ruta_n), "--proveedores", str(ruta_p),
+          "--reporte", str(reporte), "--detalle", str(detalle)])
+
+    # solo la consultoría (rubro 5) queda dentro del alcance
+    assert list(pd.read_csv(detalle, dtype=str)["documento"]) == ["1111111"]
+    assert "Alcance: 4 – Capacitaciones" in reporte.read_text(encoding="utf-8")
+
+
+def test_cli_sin_columna_de_categoria_falla_con_mensaje_claro(tmp_path):
+    import pytest
+
+    nomina, proveedores = _datos()
+    ruta_n = tmp_path / "nomina.csv"
+    ruta_p = tmp_path / "proveedores.csv"
+    nomina.to_csv(ruta_n, index=False)
+    proveedores.to_csv(ruta_p, index=False)
+    with pytest.raises(KeyError, match="--col-categoria"):
+        main(["--nomina", str(ruta_n), "--proveedores", str(ruta_p),
+              "--reporte", str(tmp_path / "r.md"), "--detalle", str(tmp_path / "d.csv")])

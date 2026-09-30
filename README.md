@@ -16,6 +16,20 @@ Los datos personales **nunca se suben a este repositorio** (ver `.gitignore`).
 
 ---
 
+## Alcance
+
+El estudio se limita a tres rubros (categorías de nivel 1) del catálogo de la DNCP:
+
+| Código | Rubro |
+|---:|---|
+| 4 | Capacitaciones y Adiestramientos |
+| 5 | Consultorías, Asesorías e Investigaciones. Estudios y Proyectos de inversión |
+| 24 | Equipos, accesorios y programas computacionales, de oficina, educativos, de imprenta, de comunicación y señalamiento |
+
+El CLI filtra por estos rubros por defecto (`--rubros 4,5,24`). Para analizar todo, usar `--todos-los-rubros`.
+
+---
+
 ## Fases
 
 | Fase | Objetivo | Estado |
@@ -59,8 +73,11 @@ Si las columnas no se detectan solas, indicarlas:
 ```bash
 python -m tesa.factibilidad \
   --nomina data/raw/nomina.csv --col-nomina documento \
-  --proveedores data/raw/proveedores.csv --col-proveedores ruc
+  --proveedores data/raw/proveedores.csv --col-proveedores ruc \
+  --col-categoria categoria
 ```
+
+La columna de categoría acepta el código (`24`, `24 - Equipos…`) o el nombre del rubro.
 
 **Salidas**
 - `reports/factibilidad.md` → solo **números agregados** (se puede compartir).
@@ -88,6 +105,7 @@ tesa/
 ├── src/tesa/
 │   ├── normalizacion.py   # cédulas, RUC, dígito verificador
 │   ├── ingesta.py         # lectura de CSV y detección de columnas
+│   ├── alcance.py         # rubros del estudio (4, 5, 24) y filtro
 │   └── factibilidad.py    # cruce nómina × proveedores + reporte
 ├── tests/
 ├── data/                  # ignorado por git
