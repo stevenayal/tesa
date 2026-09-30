@@ -39,9 +39,12 @@ def test_parsear_pagina_minimiza_datos():
     assert filas[0].perfil_url == "https://www.contrataciones.gov.py/proveedor/empresa-uno.html"
     assert filas[0].nombre_fantasia == "EMPRESA UNO S.A. FANTASIA"
     assert filas[0].categoria == 5
+    # representante legal: solo para personas jurídicas
+    assert filas[0].representante_legal == "PERSONA FICTICIA"
+    assert filas[1].representante_legal == ""
     # no se guardan datos de contacto
     assert not hasattr(filas[0], "telefono")
-    assert "PERSONA FICTICIA" not in repr(filas)
+    assert "x@ejemplo.test" not in repr(filas)
 
 
 def test_url_pagina_usa_id_interno():
@@ -80,8 +83,8 @@ def test_extraer_y_reanudar(tmp_path):
     with salida.open(encoding="utf-8") as f:
         filas = list(csv.DictReader(f))
     assert len(filas) == 12
-    assert set(filas[0]) == {"ruc", "razon_social", "nombre_fantasia", "perfil_url",
-                             "categoria", "categoria_nombre"}
+    assert set(filas[0]) == {"ruc", "razon_social", "nombre_fantasia", "representante_legal",
+                             "perfil_url", "categoria", "categoria_nombre"}
 
     # segunda corrida: ya está completo, no agrega nada
     nuevas = extraer((4,), salida, pausa=0, sesion=_SesionFalsa())

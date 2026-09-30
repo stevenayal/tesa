@@ -70,6 +70,8 @@ def normalizar_cedula(valor: object) -> str | None:
     texto = _a_texto(valor)
     if texto is None:
         return None
+    if re.search(r"[A-Za-z]", texto):  # "ANON…", "VAC…": anonimizados o vacantes
+        return None
     digitos = _SOLO_DIGITOS.sub("", texto).lstrip("0")
     if not digitos or len(digitos) > 9:
         return None

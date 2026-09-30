@@ -1,7 +1,9 @@
 """Fase 1 — prueba de factibilidad del cruce nómina × proveedores del Estado.
 
-Pregunta que responde: ¿cuántos proveedores del Estado (personas físicas)
-aparecen también en la nómina de funcionarios públicos?
+Método híbrido:
+- personas físicas: RUC = cédula (coincidencia exacta);
+- personas jurídicas: nombre del representante legal × nombre del funcionario,
+  con nivel de confianza (ver tesa.cruce_nombres).
 
 Uso:
     python -m tesa.factibilidad --nomina data/raw/nomina.csv \
@@ -24,6 +26,7 @@ from tesa.alcance import (
     filtrar_por_rubros,
     parsear_rubros,
 )
+from tesa.cruce_nombres import ResultadoNombres, cruzar_por_nombre
 from tesa.ingesta import (
     CANDIDATAS_NOMINA,
     CANDIDATAS_PROVEEDORES,
@@ -128,11 +131,49 @@ def _describir_rubros(rubros: tuple[int, ...] | None) -> str:
     return "; ".join(f"{c} – {RUBROS.get(c, 'rubro sin nombre registrado')}" for c in rubros)
 
 
+CANDIDATAS_NOMBRES = ["nombres", "nombre"]
+CANDIDATAS_APELLIDOS = ["apellidos", "apellido"]
+CANDIDATAS_ENTIDAD = ["descripcion_entidad", "descripcionentidad", "entidad_descripcion", "entidad"]
+
+
+def _buscar(df: pd.DataFrame, candidatas: list[str]) -> str | None:
+    try:
+        return detectar_columna(df, candidatas)
+    except KeyError:
+        return None
+
+
+def _seccion_nombres(rn: ResultadoNombres | None) -> str:
+    if rn is None:
+        return (
+            "\n## Personas jurídicas (por representante legal)\n\n"
+            "No se ejecutó: faltan columnas de nombres/apellidos en la nómina o "
+            "`representante_legal` en proveedores.\n"
+        )
+    n = rn.coincidencias_por_nivel
+    return f"""
+## Personas jurídicas (por representante legal)
+
+| Métrica | Valor |
+|---|---:|
+| Empresas con representante legal | {rn.empresas_con_representante:,} |
+| Representantes con nombre completo (≥ 3 palabras) | {rn.representantes_validos:,} |
+| Coincidencias de confianza **alta** (mismo nombre, único, misma entidad) | {n["alta"]:,} |
+| Coincidencias de confianza **media** (mismo nombre, único) | {n["media"]:,} |
+| Coincidencias de confianza **baja** (nombre casi idéntico, único) | {n["baja"]:,} |
+| Coincidencias **ambiguas** (homónimos; no se usan como alerta) | {n["ambigua"]:,} |
+
+Un representante legal no es necesariamente dueño de la empresa, y un nombre no
+identifica a una persona como una cédula: toda coincidencia requiere revisión humana.
+"""
+
+
 def generar_reporte(
     r: ResultadoFactibilidad,
     fuente_nomina: str,
     fuente_proveedores: str,
     rubros: tuple[int, ...] | None = RUBROS_POR_DEFECTO,
+    nombres: ResultadoNombres | None = None,
 ) -> str:
     """Reporte con números agregados únicamente (sin documentos)."""
     return f"""# Reporte de factibilidad — cruce nómina × proveedores
@@ -159,7 +200,7 @@ Alcance: {_describir_rubros(rubros)}
 | **Funcionarios que también son proveedores** | **{r.coincidencias:,}** |
 | Tasa sobre proveedores físicos | {r.tasa_sobre_fisicos:.2%} |
 | Tasa sobre funcionarios | {r.tasa_sobre_funcionarios:.2%} |
-
+{_seccion_nombres(nombres)}
 ## Aviso
 
 Una coincidencia **no implica irregularidad**: la ley permite ciertos casos y
@@ -183,6 +224,10 @@ def main(argv: list[str] | None = None) -> int:
         "--todos-los-rubros", action="store_true", help="No filtrar por rubro"
     )
     parser.add_argument("--col-categoria", help="Columna con la categoría en proveedores")
+    parser.add_argument("--adjudicaciones", help="CSV opcional con RUC de proveedor y entidad")
+    parser.add_argument("--col-adj-ruc", default="ruc")
+    parser.add_argument("--col-adj-entidad", default="entidad")
+    parser.add_argument("--detalle-nombres", default="data/output/coincidencias_nombre.csv")
     parser.add_argument("--reporte", default="reports/factibilidad.md")
     parser.add_argument("--detalle", default="data/output/coincidencias.csv")
     args = parser.parse_args(argv)
@@ -203,9 +248,25 @@ def main(argv: list[str] | None = None) -> int:
 
     resultado, detalle = cruzar(nomina, col_n, proveedores, col_p)
 
+    resultado_nombres = None
+    col_nom = _buscar(nomina, CANDIDATAS_NOMBRES)
+    col_ape = _buscar(nomina, CANDIDATAS_APELLIDOS)
+    if col_nom and col_ape and "representante_legal" in proveedores.columns:
+        adjudicaciones = leer_csv(args.adjudicaciones) if args.adjudicaciones else None
+        resultado_nombres, detalle_nombres = cruzar_por_nombre(
+            nomina, proveedores,
+            col_doc=col_n, col_nombres=col_nom, col_apellidos=col_ape, col_ruc=col_p,
+            col_entidad_nomina=_buscar(nomina, CANDIDATAS_ENTIDAD),
+            adjudicaciones=adjudicaciones,
+            col_adj_ruc=args.col_adj_ruc, col_adj_entidad=args.col_adj_entidad,
+        )
+        Path(args.detalle_nombres).parent.mkdir(parents=True, exist_ok=True)
+        detalle_nombres.to_csv(args.detalle_nombres, index=False)
+        print(f"Coincidencias por nombre: {resultado_nombres.coincidencias_por_nivel}")
+
     Path(args.reporte).parent.mkdir(parents=True, exist_ok=True)
     Path(args.reporte).write_text(
-        generar_reporte(resultado, args.nomina, args.proveedores, rubros), encoding="utf-8"
+        generar_reporte(resultado, args.nomina, args.proveedores, rubros, resultado_nombres), encoding="utf-8"
     )
     Path(args.detalle).parent.mkdir(parents=True, exist_ok=True)
     detalle.to_csv(args.detalle, index=False)

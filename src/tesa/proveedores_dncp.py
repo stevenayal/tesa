@@ -10,9 +10,10 @@ El filtro usa IDs internos distintos del código visible de la categoría:
     código visible 5  -> ID interno 21   (Consultorías, Asesorías e Investigaciones)
     código visible 24 -> ID interno 40   (Equipos, accesorios y programas computacionales)
 
-Minimización de datos: solo se guardan RUC, razón social, nombre de fantasía,
-enlace al perfil y rubro. Se descartan representante legal, dirección, teléfono
-y correo, porque no hacen falta para el cruce.
+Minimización de datos: se guardan RUC, razón social, nombre de fantasía,
+enlace al perfil y rubro. El representante legal se guarda SOLO para personas
+jurídicas (lo usa el cruce por nombre); en personas físicas no hace falta porque
+el RUC ya contiene la cédula. Se descartan dirección, teléfono y correo.
 
 IMPORTANTE: esta lista contiene proveedores *inscriptos* en cada rubro, no
 proveedores *adjudicados*. Sirve para la fase 1; el cruce final debe hacerse
@@ -38,6 +39,7 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
 from tesa.alcance import RUBROS, RUBROS_POR_DEFECTO, parsear_rubros
+from tesa.normalizacion import TipoContribuyente, normalizar_ruc
 
 URL_BASE = "https://www.contrataciones.gov.py"
 URL_BUSCADOR = URL_BASE + "/buscador/proveedores.html"
@@ -49,7 +51,10 @@ POR_PAGINA = 10
 USER_AGENT = "TESA/0.1 (tesis academica UCOM; datos abiertos DNCP)"
 
 _TOTAL = re.compile(r"Se muestran del \d+ al \d+ de ([\d.]+) resultados")
-CAMPOS = ["ruc", "razon_social", "nombre_fantasia", "perfil_url", "categoria", "categoria_nombre"]
+CAMPOS = [
+    "ruc", "razon_social", "nombre_fantasia", "representante_legal",
+    "perfil_url", "categoria", "categoria_nombre",
+]
 
 
 @dataclass(frozen=True)
@@ -57,6 +62,7 @@ class Proveedor:
     ruc: str
     razon_social: str
     nombre_fantasia: str
+    representante_legal: str  # vacío salvo en personas jurídicas
     perfil_url: str
     categoria: int
     categoria_nombre: str
@@ -88,11 +94,13 @@ def parsear_pagina(html: str, categoria: int) -> list[Proveedor]:
         ruc = campos.get("ruc", "")
         if not ruc:
             continue
+        es_juridica = normalizar_ruc(ruc).tipo is TipoContribuyente.JURIDICA
         proveedores.append(
             Proveedor(
                 ruc=ruc,
                 razon_social=_limpiar(enlace.get_text()),
                 nombre_fantasia=campos.get("nombre de fantasía", ""),
+                representante_legal=campos.get("representante legal", "") if es_juridica else "",
                 perfil_url=urljoin(URL_BASE, enlace.get("href", "")),
                 categoria=categoria,
                 categoria_nombre=RUBROS.get(categoria, ""),

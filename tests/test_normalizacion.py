@@ -45,7 +45,9 @@ class TestNormalizarCedula:
     def test_formatos(self, entrada, esperado):
         assert normalizar_cedula(entrada) == esperado
 
-    @pytest.mark.parametrize("entrada", [None, "", "nan", math.nan, "abc", "1234567890123"])
+    @pytest.mark.parametrize(
+        "entrada", [None, "", "nan", math.nan, "abc", "1234567890123", "ANON999", "VAC2720062"]
+    )
     def test_invalidos(self, entrada):
         assert normalizar_cedula(entrada) is None
 

@@ -102,10 +102,25 @@ pytest
 
 ---
 
-## Cómo funciona el cruce
+## Cómo funciona el cruce (método híbrido)
 
-- En Paraguay, el **RUC de una persona física es su cédula + un dígito verificador** (`1234567-9`).
-- Los RUC de **personas jurídicas** empiezan en `80000000` y **no se pueden cruzar** con la nómina sin datos de socios o beneficiarios finales. La fase 1 mide también qué proporción de proveedores quedan fuera del cruce por esta razón.
+| Proveedor | Cruce | Confianza |
+|---|---|---|
+| Persona física | RUC = cédula + dígito verificador → coincidencia exacta con la nómina | Alta |
+| Persona jurídica | Nombre del **representante legal** × nombre del funcionario | Según nivel |
+
+Niveles del cruce por nombre (`tesa.cruce_nombres`):
+
+| Nivel | Criterio | ¿Alerta? |
+|---|---|---|
+| **alta** | Nombre completo idéntico, único en la nómina y el funcionario trabaja en una entidad que adjudicó a la empresa (requiere `--adjudicaciones`) | Sí |
+| **media** | Nombre completo idéntico y único en la nómina | Sí |
+| **baja** | Nombre casi idéntico (similitud ≥ 0,93, posible tipeo) y único | Sí, con revisión |
+| **ambigua** | El nombre corresponde a 2 o más funcionarios (homónimos) | **No** |
+
+Reglas: se normalizan mayúsculas, tildes y partículas (*de*, *del*…); el orden de las palabras no importa; se descartan nombres de menos de 3 palabras y los documentos anonimizados o vacantes.
+
+Limitaciones: un nombre no identifica a una persona como una cédula, y el representante legal no es necesariamente dueño de la empresa. **Toda coincidencia por nombre requiere revisión humana.**
 
 ---
 
@@ -118,6 +133,8 @@ tesa/
 │   ├── ingesta.py         # lectura de CSV y detección de columnas
 │   ├── alcance.py         # rubros del estudio (4, 5, 24) y filtro
 │   ├── proveedores_dncp.py # extractor del buscador de proveedores
+│   ├── nombres.py         # normalización y similitud de nombres
+│   ├── cruce_nombres.py   # cruce por representante legal con niveles de confianza
 │   └── factibilidad.py    # cruce nómina × proveedores + reporte
 ├── tests/
 ├── data/                  # ignorado por git
