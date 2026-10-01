@@ -21,8 +21,8 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from tesa.normalizacion import normalizar_cedula
 from tesa.nombres import clave, normalizar_nombre, similitud
+from tesa.normalizacion import normalizar_cedula
 
 UMBRAL_APROXIMADA = 0.93
 MIN_PALABRAS = 3
@@ -150,7 +150,7 @@ def cruzar_por_nombre(
     )
     por_nivel = {n: int((detalle["nivel"] == n).sum()) for n in NIVELES}
     resumen = ResultadoNombres(
-        empresas_con_representante=int(len(con_repr)),
+        empresas_con_representante=len(con_repr),
         representantes_validos=validos,
         coincidencias_por_nivel=por_nivel,
     )

@@ -36,6 +36,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from urllib.parse import urljoin
 
+import requests
 from bs4 import BeautifulSoup
 
 from tesa.alcance import RUBROS, RUBROS_POR_DEFECTO, parsear_rubros
@@ -128,7 +129,7 @@ def _descargar(sesion, url: str, reintentos: int = 3, pausa: float = 1.0) -> str
             if respuesta.status_code == 200:
                 return respuesta.text
             ultimo = RuntimeError(f"HTTP {respuesta.status_code}")
-        except Exception as e:  # red inestable: reintentar
+        except requests.RequestException as e:  # red inestable: reintentar
             ultimo = e
         time.sleep(pausa * 2**intento)
     raise RuntimeError(f"No se pudo descargar {url}: {ultimo}")
@@ -155,8 +156,6 @@ def extraer(
 ) -> dict[int, int]:
     """Recorre el buscador y agrega filas a `salida`. Devuelve filas nuevas por rubro."""
     if sesion is None:
-        import requests
-
         sesion = requests.Session()
         sesion.headers["User-Agent"] = USER_AGENT
 
