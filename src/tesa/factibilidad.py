@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -98,11 +98,11 @@ def cruzar(
     resultado = ResultadoFactibilidad(
         funcionarios_unicos=int(conteo_nomina.size),
         registros_nomina_invalidos=invalidos_nomina,
-        proveedores_unicos=int(len(unicos)),
-        proveedores_fisicos=int(len(fisicos)),
+        proveedores_unicos=len(unicos),
+        proveedores_fisicos=len(fisicos),
         proveedores_juridicos=int((unicos["tipo"] == TipoContribuyente.JURIDICA.value).sum()),
         proveedores_invalidos=int((prov["tipo"] == TipoContribuyente.INVALIDO.value).sum()),
-        proveedores_dv_incorrecto=int((unicos["dv_valido"] == False).sum()),  # noqa: E712
+        proveedores_dv_incorrecto=int((unicos["dv_valido"] == False).sum()),
         coincidencias=len(comunes),
     )
     return resultado, detalle
@@ -178,7 +178,7 @@ def generar_reporte(
     """Reporte con números agregados únicamente (sin documentos)."""
     return f"""# Reporte de factibilidad — cruce nómina × proveedores
 
-Generado: {date.today().isoformat()}
+Generado: {datetime.now(UTC).astimezone().date().isoformat()}
 
 Fuentes: `{Path(fuente_nomina).name}` × `{Path(fuente_proveedores).name}`
 

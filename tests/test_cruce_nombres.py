@@ -68,7 +68,7 @@ def test_ignora_documentos_anonimizados_y_vacantes():
     proveedores = pd.DataFrame(
         {"ruc": ["80000077-7"], "representante_legal": ["NOMBRES DEL FUNCIONARIO APELLIDOS DEL FUNCIONARIO"]}
     )
-    resumen, detalle = cruzar_por_nombre(
+    _, detalle = cruzar_por_nombre(
         _nomina(), proveedores, col_doc="documento", col_nombres="nombres", col_apellidos="apellidos",
     )
     assert detalle.empty
