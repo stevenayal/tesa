@@ -35,3 +35,10 @@ Thumbs.db
 
 # Notebooks
 .ipynb_checkpoints/
+
+# Caso ueno: documentos de trabajo que nombran a personas (no versionar; el repo es público)
+investigaciones/caso_ueno/*.md
+!investigaciones/caso_ueno/README.md
+reports/caso_ueno.md
+# Serie agregada del MEF: solo montos institucionales, sin datos personales
+!investigaciones/caso_ueno/serie_fondos_publicos_ueno.csv
