@@ -116,9 +116,19 @@ Niveles del cruce por nombre (`tesa.cruce_nombres`):
 | **alta** | Nombre completo idéntico, único en la nómina y el funcionario trabaja en una entidad que adjudicó a la empresa (requiere `--adjudicaciones`) | Sí |
 | **media** | Nombre completo idéntico y único en la nómina | Sí |
 | **baja** | Nombre casi idéntico (similitud ≥ 0,93, posible tipeo) y único | Sí, con revisión |
-| **ambigua** | El nombre corresponde a 2 o más funcionarios (homónimos) | **No** |
+| **ambigua** | El nombre corresponde a 2 o más funcionarios (homónimos en la nómina) **o**, si se pasa el padrón de RUC, a 2 o más personas físicas del país (homónimo poblacional) | **No** |
 
 Reglas: se normalizan mayúsculas, tildes y partículas (*de*, *del*…); el orden de las palabras no importa; se descartan nombres de menos de 3 palabras y los documentos anonimizados o vacantes.
+
+**Homónimos poblacionales.** Que un nombre sea único en la nómina no lo hace único en el país: sin el padrón, *alta*/*media* solo significa "único entre los funcionarios". `cruzar_por_nombre(..., frecuencia_poblacional=...)` recibe cuántas personas físicas tienen cada nombre en el padrón nacional de RUC; si el nombre de la nómina que coincidió aparece más de una vez, la coincidencia pasa a *ambigua* (`motivo = "homónimo poblacional"`). El detalle trae la columna `homonimos_pais` (vacía si no se pasa el padrón). Sin el parámetro los niveles no cambian.
+
+```python
+from tesa.padron_ruc import cargar_frecuencia_nombres
+frecuencia = cargar_frecuencia_nombres("data/raw/ruc")   # ~10 s, ~1,8 M personas físicas
+resumen, detalle = cruzar_por_nombre(..., frecuencia_poblacional=frecuencia)
+```
+
+El padrón lo publica la DNIT como `ruc0.zip` … `ruc9.zip` ([listado de RUC con sus equivalencias](https://www.dnit.gov.py/web/portal-institucional/listado-de-ruc-con-sus-equivalencias)); descomprimir los `ruc*.txt` en `data/raw/ruc/` (ignorado por git). Se cuentan las personas físicas (nombre `APELLIDOS, NOMBRES`, excluido el rango de RUC de personas jurídicas 80…) de cualquier estado, incluso canceladas.
 
 Limitaciones: un nombre no identifica a una persona como una cédula, y el representante legal no es necesariamente dueño de la empresa. **Toda coincidencia por nombre requiere revisión humana.**
 
@@ -135,6 +145,7 @@ tesa/
 │   ├── proveedores_dncp.py # extractor del buscador de proveedores
 │   ├── nombres.py         # normalización y similitud de nombres
 │   ├── cruce_nombres.py   # cruce por representante legal con niveles de confianza
+│   ├── padron_ruc.py      # frecuencia de nombres en el padrón de RUC (homónimos poblacionales)
 │   └── factibilidad.py    # cruce nómina × proveedores + reporte
 ├── tests/
 ├── data/                  # ignorado por git

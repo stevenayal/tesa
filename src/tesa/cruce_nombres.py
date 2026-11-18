@@ -7,8 +7,14 @@ nivel de confianza, porque un nombre no identifica a una persona como una cédul
              en una entidad que adjudicó contratos a la empresa
     media    nombre completo idéntico y único en la nómina
     baja     nombre casi idéntico (posible error de tipeo) y único en la nómina
-    ambigua  el nombre corresponde a 2 o más funcionarios distintos (homónimos):
+    ambigua  el nombre corresponde a 2 o más funcionarios distintos (homónimos en
+             la nómina) o, si se pasa ``frecuencia_poblacional``, a 2 o más
+             personas físicas del padrón nacional de RUC (homónimo poblacional):
              se informa pero NO se usa como alerta
+
+Que un nombre sea único en la nómina no lo hace único en el país: sin el padrón,
+"media"/"alta" solo significa "único entre los funcionarios". La frecuencia
+poblacional se arma con ``tesa.padron_ruc.cargar_frecuencia_nombres``.
 
 Solo se consideran nombres de al menos 3 palabras (sin partículas), porque con
 menos la probabilidad de homónimos es demasiado alta.
@@ -17,6 +23,7 @@ menos la probabilidad de homónimos es demasiado alta.
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 import pandas as pd
@@ -27,6 +34,12 @@ from tesa.normalizacion import normalizar_cedula
 UMBRAL_APROXIMADA = 0.93
 MIN_PALABRAS = 3
 NIVELES = ("alta", "media", "baja", "ambigua")
+MOTIVO_HOMONIMOS_NOMINA = "homónimos en la nómina"
+MOTIVO_HOMONIMO_POBLACIONAL = "homónimo poblacional"
+COLUMNAS_DETALLE = [
+    "ruc_empresa", "tipo", "similitud", "funcionarios_con_ese_nombre", "homonimos_pais", "documentos",
+    "nivel", "motivo",
+]
 
 
 @dataclass(frozen=True)
@@ -91,8 +104,15 @@ def cruzar_por_nombre(
     adjudicaciones: pd.DataFrame | None = None,
     col_adj_ruc: str = "ruc",
     col_adj_entidad: str = "entidad",
+    frecuencia_poblacional: Mapping[str, int] | None = None,
 ) -> tuple[ResultadoNombres, pd.DataFrame]:
-    """Devuelve el resumen y el detalle (uso privado) de coincidencias por nombre."""
+    """Devuelve el resumen y el detalle (uso privado) de coincidencias por nombre.
+
+    ``frecuencia_poblacional`` (opcional) mapea ``tesa.nombres.clave`` -> cantidad de
+    personas físicas con ese nombre en el país (padrón de RUC). Si el nombre de la
+    nómina que coincidió aparece más de una vez, la coincidencia pasa a "ambigua".
+    Sin este parámetro, ``homonimos_pais`` queda vacío y los niveles no cambian.
+    """
     por_clave, por_palabra, entidades_doc = _indice_nomina(
         nomina, col_doc, col_nombres, col_apellidos, col_entidad_nomina
     )
@@ -125,8 +145,14 @@ def cruzar_por_nombre(
             tipo, clave_nomina, sim = "aproximada", mejor[0], mejor[1]
 
         documentos = por_clave[clave_nomina]
+        homonimos_pais = (
+            None if frecuencia_poblacional is None else int(frecuencia_poblacional.get(clave_nomina, 0))
+        )
+        motivo = ""
         if len(documentos) > 1:
-            nivel = "ambigua"
+            nivel, motivo = "ambigua", MOTIVO_HOMONIMOS_NOMINA
+        elif homonimos_pais is not None and homonimos_pais > 1:
+            nivel, motivo = "ambigua", MOTIVO_HOMONIMO_POBLACIONAL
         elif tipo == "aproximada":
             nivel = "baja"
         else:
@@ -139,15 +165,15 @@ def cruzar_por_nombre(
                 "tipo": tipo,
                 "similitud": round(sim, 3),
                 "funcionarios_con_ese_nombre": len(documentos),
+                "homonimos_pais": homonimos_pais,
                 "documentos": ";".join(sorted(documentos)),
                 "nivel": nivel,
+                "motivo": motivo,
             }
         )
 
-    detalle = pd.DataFrame(
-        filas,
-        columns=["ruc_empresa", "tipo", "similitud", "funcionarios_con_ese_nombre", "documentos", "nivel"],
-    )
+    detalle = pd.DataFrame(filas, columns=COLUMNAS_DETALLE)
+    detalle["homonimos_pais"] = detalle["homonimos_pais"].astype("Int64")
     por_nivel = {n: int((detalle["nivel"] == n).sum()) for n in NIVELES}
     resumen = ResultadoNombres(
         empresas_con_representante=len(con_repr),
